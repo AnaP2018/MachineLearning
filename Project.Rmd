@@ -1,0 +1,96 @@
+---
+title: "Human Activity Recognition"
+date: 25/11/2018
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+##Executive Summary
+One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it. In this project, the goal is to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants and to predict the manner in which they did the exercise. They were asked to perform barbell lifts correctly and incorrectly in 5 different ways. More information and data download is available from the website here: http://web.archive.org/web/20161224072740/http:/groupware.les.inf.puc-rio.br/har. 
+
+
+## Setup and Data Loading and Cleaning
+After reviewing the data structure, the relevant libraries were uploaded and the data was loaded:
+
+```{r,message=FALSE,include=FALSE}
+library(caret)
+library(rpart)
+library(rpart.plot)
+library(RColorBrewer)
+library(rattle)
+library(randomForest)
+
+```
+
+```{r}
+trainingLink <- "http://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv"
+testingLink <- "http://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv"
+training <- read.csv(trainingLink)
+testing <- read.csv(testingLink)
+dim(training)
+dim(testing)
+
+```
+
+To simplify the data the following steps were taken:
+
+1. Remove the first 7 columns that have time series and identification variables which will not be used.
+2. Remove all columns that are are not numeric and data is "NA".
+
+```{r}
+usableVariables<- names(testing[,colSums(is.na(testing)) == 0])[8:59]
+training <- training[,c(usableVariables,"classe")]
+testing <- testing[,c(usableVariables,"problem_id")]
+dim(training) 
+dim(testing)
+```
+
+## Training Data
+
+The next step is to split the training data into a training and testing sets. The other set of data will be used for prediction. The split is done on 60%/train and 40%/test.
+
+```{r}
+inTrain <- createDataPartition(training$classe, p=0.6, list=FALSE)
+trainingTrain <- training[inTrain, ]
+trainingTest <- training[-inTrain, ]
+dim(trainingTrain)
+dim(trainingTest)
+```
+##Cross Validation
+Cross validation is setup to limit overfitting and improve model efficiency.
+```{r}
+tControl <- trainControl(method = "cv", number = 3)
+```
+
+## Modeling
+The following two models were used to train and test the data:
+
+### Random Forest Model
+```{r}
+set.seed(3833)
+modelRF<-train(classe ~ ., data = trainingTrain,trControl=tControl,
+  method='rf',ntree=100)
+predictRF <- predict(modelRF, trainingTest)
+confusionMatrix(predictRF, trainingTest$classe)
+```
+
+### Decision Tree Model
+```{r}
+set.seed(3833)
+modelDT<- train(classe ~ ., data = trainingTrain,trControl=tControl,method='rpart')
+predictDT <- predict(modelDT, trainingTest)
+confusionMatrix(predictDT, trainingTest$classe)
+```
+
+
+## Out of Sample Error and Conclusion 
+The random forest model provides a 99% accuracy and the decision tree model provides a 55% accuracy. Given the much lower out of sample error for the random forest model, it will be used in the prediction exercise.
+
+
+##Prediction of Testing Data
+```{r}
+predictRFQuiz <- predict(modelRF, testing)
+predictRFQuiz
+```
